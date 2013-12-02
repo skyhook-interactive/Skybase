@@ -14,7 +14,7 @@ module.exports = function(advanced, defaults) {
 
 	return [
 		{
-			message: 'WordPress URL',
+			message: 'WordPress URL:',
 			name: 'url',
 			default: defaults.url || null,
 			validate: requiredValidate,
@@ -26,33 +26,33 @@ module.exports = function(advanced, defaults) {
 				return value;
 			}
 		}, {
-			message: 'WordPress Version',
+			message: 'WordPress Version:',
 			name: 'wpVer',
 			default: defaults.wpVer || null,
 			validate: requiredValidate,
 			when: advancedWhen,
 		}, {
-			message: 'Table prefix',
+			message: 'Table prefix:',
 			name: 'tablePrefix',
 			default: defaults.tablePrefix || 'wp_',
 			validate: requiredValidate
 		}, {
-			message: 'Database host',
+			message: 'Database host:',
 			name: 'dbHost',
 			default: defaults.dbHost || 'localhost',
 			validate: requiredValidate
 		}, {
-			message: 'Database name',
+			message: 'Database name:',
 			name: 'dbName',
 			default: defaults.dbName || null,
 			validate: requiredValidate
 		}, {
-			message: 'Database user',
+			message: 'Database user:',
 			name: 'dbUser',
 			default: defaults.dbUser || null,
 			validate: requiredValidate
 		}, {
-			message: 'Database password',
+			message: 'Database password:',
 			name: 'dbPass',
 			default: defaults.dbPass || null
 		}, {
@@ -61,80 +61,12 @@ module.exports = function(advanced, defaults) {
 			default: defaults.git || 'N',
 			type: 'confirm'
 		}, {
-		/*	message: 'Would you like to install WordPress as a submodule?',
-			name: 'submodule',
-			type: 'confirm',
-			default: defaults.submodule || false,
-			when: function(res) {
-				return !!res.git;
-			}
-		}, {
-			message: 'Would you like to install WordPress with the custom directory structure?',
-			name: 'customDirs',
-			type: 'confirm',
-			default: defaults.customDirs || false,
-			when: function(res) {
-				return !res.git || !res.submodule;
-			}
-		}, {
-			message: 'WordPress install directory',
-			name: 'wpDir',
-			default: defaults.wpDir || 'wordpress',
-			when: function(res) {
-				return !!res.submodule || !!res.customDirs;
-			}
-		}, {
-			message: 'WordPress content directory',
-			name: 'contentDir',
-			default: defaults.contentDir || 'content',
-			validate: requiredValidate,
-			when: function(res) {
-				return !!res.submodule || !!res.customDirs;
-			}
-		}, {
-			message: 'Create local-config.php?',
-			name: 'createLocalConfig',
-			type: 'confirm',
-			default: defaults.createLocalConfig || true
-		}, {
-			message: 'Block external WP requests?',
-			name: 'blockExternalRequests',
-			type: 'confirm',
-			default: defaults.blockExternalRequests || false,
-			when: advancedWhen
-		}, {
-			message: 'Add wp-config.php to .gitignore?',
-			name: 'ignoreWPConfig',
-			type: 'confirm',
-			default: defaults.ignoreWPConfig || false,
-			validate: requiredValidate,
-			when: function(res) {
-				return (advanced && !!res.git);
-			}
-		}, {
-			message: 'Add WordPress Core files to .gitignore?',
-			name: 'ignoreWPCore',
-			type: 'confirm',
-			default: defaults.ignoreWPCore || false,
-			validate: requiredValidate,
-			when: function(res) {
-				return (advancedWhen() && !!res.git);
-			}
-		}, {
-			message: 'Use Vagrant?',
-			name: 'vagrant',
-			type: 'confirm',
-			default: defaults.vagrant || false,
-			when: advancedWhen,
-			validate: requiredValidate
-		}, {
-		*/
 			message: 'Install a custom theme?',
 			name: 'installTheme',
 			type: 'confirm',
 			default: (typeof defaults.installTheme !== 'undefined') ? defaults.installTheme : true
 		}, {
-			message: 'Destination directory',
+			message: 'Theme directory name:',
 			name: 'themeDir',
 			default: defaults.themeDir || 'skybase',
 			validate: requiredValidate,
@@ -142,7 +74,7 @@ module.exports = function(advanced, defaults) {
 				return !!res.installTheme;
 			}
 		}, {
-			message: 'Theme source type (git/tar)',
+			message: 'Theme source type (git/tar):',
 			name: 'themeType',
 			default: defaults.themeType || 'git',
 			validate: function(value) {
@@ -155,7 +87,7 @@ module.exports = function(advanced, defaults) {
 				return !!res.installTheme;
 			}
 		}, {
-			message: 'GitHub username',
+			message: 'GitHub username:',
 			name: 'themeUser',
 			default: defaults.themeUser || 'roots',
 			validate: requiredValidate,
@@ -163,7 +95,7 @@ module.exports = function(advanced, defaults) {
 				return !!res.installTheme && res.themeType == 'git';
 			}
 		}, {
-			message: 'GitHub repository name',
+			message: 'GitHub repository name:',
 			name: 'themeRepo',
 			default: defaults.themeRepo || 'roots',
 			validate: requiredValidate,
@@ -171,7 +103,7 @@ module.exports = function(advanced, defaults) {
 				return !!res.installTheme && res.themeType == 'git';
 			}
 		}, {
-			message: 'Repository branch',
+			message: 'Repository branch:',
 			name: 'themeBranch',
 			default: defaults.themeBranch || 'master',
 			validate: requiredValidate,
@@ -179,7 +111,7 @@ module.exports = function(advanced, defaults) {
 				return !!res.installTheme && res.themeType == 'git';
 			}
 		}, {
-			message: 'Remote tarball url',
+			message: 'Remote tarball url:',
 			name: 'themeTarballUrl',
 			default: defaults.themeTarballUrl || 'https://github.com/roots/roots/tarball/master',
 			validate: requiredValidate,
@@ -187,10 +119,22 @@ module.exports = function(advanced, defaults) {
 				return !!res.installTheme && res.themeType == 'tar';
 			}
 		}, {
-			message: 'Install Advanced Custom Fields plugin?',
-			name: 'installACF',
-			type: 'confirm',
-			default: defaults.installACF || true
+		    type: 'checkbox',
+		    name: 'pluginsList',
+		    message: 'Which plugins would you like to install?',
+		    choices: [{
+		      name: 'Advanced Custom Fields',
+		      value: 'ACFplugin',
+		      checked: true
+		    }, {
+		      name: 'Gravity Forms',
+		      value: 'gravityForms',
+		      checked: true
+		    }, {
+		      name: 'Simple Page Ordering',
+		      value: 'simplePageOrdering',
+		      checked: true
+		    }]
 		}
 	];
 };

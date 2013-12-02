@@ -99,17 +99,6 @@ Generator.prototype.ohTellMeWhatYouWantWhatYouReallyReallyWant = function() {
 					// Remove port from url
 					input.url = input.url.replace(portRegex, '');
 
-					// Set customDirs to true if installing as a submodule
-					if (input.submodule) {
-						input.customDirs = true;
-					}
-
-					// Set dirs if custom dir's is not set
-					if (!input.customDirs) {
-						input.wpDir = '.';
-						input.contentDir = 'wp-content';
-					}
-
 					// Save the users input
 					me.conf.set(input);
 					me.logger.verbose('User Input: ' + JSON.stringify(me.conf.get(), null, '  '));
@@ -160,75 +149,18 @@ Generator.prototype.gitIsTheShiz = function() {
 
 };
 
-// Setup Vagrant config
-Generator.prototype.heIsSuchAVagrant = function() {
-
-	if (this.conf.get('vagrant')) {
-		this.logger.log('Setting up Vagrant');
-		this.logger.verbose('Copying vagrant file');
-		this.template('Vagrantfile', 'Vagrantfile');
-		this.logger.verbose('Copying puppet files');
-		this.bulkDirectory('puppet', 'puppet');
-		this.logger.verbose('Finished setting up Vagrant');
-	}
-
-};
-
 // Install wordpress
 Generator.prototype.installWP = function() {
 
 	var done = this.async(),
 		me   = this;
 
-	if (this.conf.get('submodule')) {
-		this.logger.log('Installing WordPress ' + this.conf.get('wpVer') + ' as a submodule');
-		git.submoduleAdd(wordpress.repo, this.conf.get('wpDir'), function(err) {
-			if (err) me.logger.error(err);
-
-			me.logger.verbose('Submodule added');
-			var cwd = process.cwd();
-			git._baseDir = me.conf.get('wpDir');
-			me.logger.verbose('Checking out WP version ' + me.conf.get('wpVer'));
-			git.checkout(me.conf.get('wpVer'), function(err) {
-				if (err) me.logger.error(err);
-				git._baseDir = cwd;
-				me.logger.verbose('WordPress installed');
-				done();
-			});
-		});
-
-	} else {
-
-		this.logger.log('Installing WordPress ' + this.conf.get('wpVer'));
-		this.remote('wordpress', 'wordpress', this.conf.get('wpVer'), function(err, remote) {
-			remote.bulkDirectory('.', me.conf.get('wpDir'));
-			me.logger.log('WordPress installed');
-			done();
-		});
-
-	}
-
-};
-
-// Setup custom directory structure
-Generator.prototype.somethingsDifferent = function() {
-
-	if (this.conf.get('submodule') || this.conf.get('customDirs')) {
-
-		var me = this,
-			done = this.async();
-
-		this.logger.verbose('Copying index.php');
-		this.template('index.php.tmpl', 'index.php');
-
-		this.logger.log('Setting up the content directory');
-		this.remote('wordpress', 'wordpress', this.conf.get('wpVer'), function(err, remote) {
-			remote.directory('wp-content', me.conf.get('contentDir'));
-			me.logger.verbose('Content directory setup');
-			done();
-		});
-
-	}
+	this.logger.log('Installing WordPress ' + this.conf.get('wpVer'));
+	this.remote('wordpress', 'wordpress', this.conf.get('wpVer'), function(err, remote) {
+		remote.directory('.', '.');
+		me.logger.log('WordPress installed');
+		done();
+	});
 
 };
 
@@ -257,9 +189,6 @@ Generator.prototype.localConfig = function() {
 
 
 // Set some permissions
-/* @TODO Thinking that maybe permissions should be left up to the user
-   BUT, it seems that the theme stuff needs some permissions set to work....
-*/
 Generator.prototype.setPermissions = function() {
 
 	if (fs.existsSync('.')) {
@@ -268,14 +197,7 @@ Generator.prototype.setPermissions = function() {
 		this.logger.verbose('Done setting permissions on .');
 	}
 
-	if (fs.existsSync(this.conf.get('contentDir'))) {
-		this.logger.log('Setting Permissions: 0775 on ' + this.conf.get('contentDir'));
-		wrench.chmodSyncRecursive(this.conf.get('contentDir'), 0775);
-		this.logger.verbose('Done setting permissions on ' + this.conf.get('contentDir'));
-	}
-
 };
-/**/
 
 // Commit the wordpress stuff
 Generator.prototype.commitThisToMemory = function() {
@@ -330,18 +252,51 @@ Generator.prototype.themeSetup = function() {
 
 };
 
-// Install plugins
-Generator.prototype.pluginSetup = function() {
-	if (this.conf.get('installACF')) {
-		var done = this.async()
-			me = this;
+Generator.prototype.installACFplugin = function() {
+	var plugins = this.conf.get('pluginsList');
+
+	if(plugins.indexOf('ACFplugin') > -1){
+		var done = this.async();
 
 		this.logger.log('Installing Advanced Custom Fields plugin');
-		wordpress.installPlugins(this, this.conf.get(), function() {
-			me.logger.verbose('Plugin install complete');
+		wordpress.installACF(this, this.conf.get(), function() {
 			done();
 		});
 	}
+}
+
+Generator.prototype.installGFplugin = function() {
+	var plugins = this.conf.get('pluginsList');
+
+	if(plugins.indexOf('gravityForms') > -1){
+		var done = this.async();
+
+		this.logger.log('Installing Gravity Forms plugin');
+		this.directory('gravityforms', 'wp-content/plugins/gravityforms');
+		done();
+	}
+}
+
+Generator.prototype.installSPOplugin = function() {
+	var plugins = this.conf.get('pluginsList');
+
+	if(plugins.indexOf('simplePageOrdering') > -1){
+		var done = this.async();
+
+		this.logger.log('Installing Simple Page Ordering plugin');
+		this.directory('simple-page-ordering', 'wp-content/plugins/simple-page-ordering');
+		done();
+	}
+}
+
+Generator.prototype.removeHelloDolly = function() {
+	var done = this.async()
+		me = this;
+
+	rimraf('wp-content/plugins/hello.php', function () {
+        me.logger.log('Removing Hello Dolly');
+        done();
+    });
 }
 
 // Setup theme
@@ -373,42 +328,13 @@ Generator.prototype.gitMeMOARCommits = function() {
 
 };
 
-// Run vagrant up
-Generator.prototype.vagrantUp = function() {
-
-	if (this.conf.get('vagrant')) {
-		var done = this.async();
-		this.logger.log('Running vagrant up');
-		var me = this;
-		var child = require('child_process').exec('vagrant up', function(err) {
-			if (err) return me.logger.error(err);
-			me.logger.verbose('Finished running Vagrant');
-			done();
-		});
-		child.on('error', function(err) {
-			process.stderr.write(err);
-		});
-		child.stdout.on('data', function(data) {
-			process.stdout.write(data);
-		});
-		child.stderr.on('data', function(err) {
-			process.stderr.write(err);
-		});
-	}
-
-};
-
 // Save settings to .yeopress file
-Generator.prototype.saveDaSettings = function() {
-
+Generator.prototype.saveSettings = function() {
 	this.logger.log('Writing .yeopress file');
 	fs.writeFileSync('.yeopress', JSON.stringify(this.conf.get(), null, '\t'));
-
 };
 
 // All done
-Generator.prototype.oopsIPeedMyself = function() {
-	this.logger.log(chalk.bold.green('\nAll Done!!\n------------------------\n'), {logPrefix: ''});
-	this.logger.log('I tried my best to set things up, but I\'m only human right? **wink wink**\nSo, you should probably check your `wp-config.php` to make sure all the settings work on your environment.', {logPrefix: ''});
-	this.logger.log('Have fun pressing your words!\n', {logPrefix: ''});
+Generator.prototype.thatsAllFolks = function() {
+	this.logger.log(chalk.bold.green('\nThat\'s all folks!\n'), {logPrefix: ''});
 };

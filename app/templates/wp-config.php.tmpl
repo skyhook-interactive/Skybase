@@ -13,7 +13,7 @@
  *
  * @package WordPress
  */
- 
+
 // Include local configuration
 if (file_exists(dirname(__FILE__) . '/local-config.php')) {
 	include(dirname(__FILE__) . '/local-config.php');
@@ -72,35 +72,7 @@ $table_prefix  = '<%= conf.get('tablePrefix') %>';
  * language support.
  */
 define('WPLANG', '');
-<% if (conf.get('customDirs')) { %>
-/**
- * Set custom paths
- *
- * These are required because wordpress is installed in a subdirectory.
- */
-if (!defined('WP_SITEURL')) {
-	define('WP_SITEURL', 'http://' . $_SERVER['SERVER_NAME'] . '<%= (conf.get('port')) ? ':' + conf.get('port') : '' %>/<%= conf.get('wpDir') %>');
-}
-if (!defined('WP_HOME')) {
-	define('WP_HOME',    'http://' . $_SERVER['SERVER_NAME'] . '<%= (conf.get('port')) ? ':' + conf.get('port') : '' %>');
-}
-if (!defined('WP_CONTENT_DIR')) {
-	define('WP_CONTENT_DIR', dirname(__FILE__) . '/<%= conf.get('contentDir') %>');
-}
-if (!defined('WP_CONTENT_URL')) {
-	define('WP_CONTENT_URL', 'http://' . $_SERVER['SERVER_NAME'] . '<%= (conf.get('port')) ? ':' + conf.get('port') : '' %>/<%= conf.get('contentDir') %>');
-}
-<% } %>
-<% if (conf.get('blockExternalRequests')) { %>
-/**
- * Disable external requests
- *
- * This is so that users dont see update requests since things are managed through git
- */
-if (!defined('WP_HTTP_BLOCK_EXTERNAL')) {
-	define('WP_HTTP_BLOCK_EXTERNAL', true);
-}
-<% } %>
+
 /**
  * For developers: WordPress debugging mode.
  *

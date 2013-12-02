@@ -138,19 +138,19 @@ function installTheme(generator, config, done) {
 
     if (config.themeType == 'git') {
         generator.remote(config.themeUser, config.themeRepo, config.themeBranch, function(err, remote) {
-            remote.directory('.', path.join(config.contentDir, 'themes', config.themeDir));
+            remote.directory('.', path.join('wp-content/themes', config.themeDir));
             done();
         });
     } else if (config.themeType == 'tar') {
-        generator.tarball(config.themeTarballUrl, path.join(config.contentDir, 'themes', config.themeDir), done);
+        generator.tarball(config.themeTarballUrl, path.join('wp-content/themes', config.themeDir), done);
     }
 
 };
 
-function installPlugins(generator, config, done) {
+function installACF(generator, config, done) {
 
     generator.remote('elliotcondon', 'acf', 'master', function(err, remote) {
-        remote.directory('.', path.join(config.contentDir, 'plugins', 'acf'));
+        remote.directory('.', path.join('wp-content/plugins', 'acf'));
         done();
     });
 
@@ -195,6 +195,6 @@ module.exports = {
 	loadConfig : loadConfig,
 	getContentDir : getContentDir,
 	installTheme : installTheme,
-	installPlugins : installPlugins,
+	installACF : installACF,
 	setupTheme : setupTheme
 };
