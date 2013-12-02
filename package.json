@@ -5,39 +5,39 @@
   "keywords": [
     "yeoman-generator",
     "wordpress",
-    "install wordpress",
+    "yeoman",
     "generator"
   ],
-  "homepage": "https://github.com/mattbob/Skybase",
-  "bugs": "https://github.com/mattbob/Skybase/issues",
-  "author": {
-    "name": "Mattbob",
-    "url": "https://github.com/mattbob"
-  },
   "main": "app/index.js",
+  "author": {
+    "name": "Skyhook Marketing"
+  },
+  "license": "BSD",
+  "dependencies": {
+    "yeoman-generator": "~0.14.0-rc.2",
+    "rimraf": ">=2.1.4",
+    "wrench": "~1.4.4",
+    "mysql": "~2.0.0-alpha7",
+    "chalk": "~0.2.1",
+    "simple-git": "~0.2.0"
+  },
   "repository": {
     "type": "git",
     "url": "git://github.com/mattbob/Skybase.git"
   },
-  "scripts": {
-    "test": "mocha"
-  },
-  "dependencies": {
-    "yeoman-generator": "~0.13.1",
-  },
   "devDependencies": {
-    "mocha": "~1.12.0"
+    "grunt": "~0.4.1",
+    "mocha": "~1.13.0",
+    "istanbul": "~0.1.44",
+    "grunt-contrib-clean": "~0.5.0",
+    "grunt-contrib-connect": "~0.5.0",
+    "grunt-simple-mocha": "~0.4.0"
   },
-  "peerDependencies": {
-    "yo": ">=1.0.4"
+  "scripts": {
+    "test": "node_modules/istanbul/lib/cli.js test node_modules/mocha/bin/_mocha --dir test/coverage"
   },
-  "engines": {
-    "node": ">=0.8.0",
-    "npm": ">=1.2.10"
-  },
-  "licenses": [
-    {
-      "type": "MIT"
-    }
-  ]
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/mattbob/Skybase/issues"
+  }
 }

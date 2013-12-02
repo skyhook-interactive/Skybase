@@ -1,229 +1,414 @@
-'use strict';
+/**================================
+ * Setting up the basics
+ **===============================*/
 
-var util = require('util');
-var path = require('path');
-var yeoman = require('yeoman-generator');
+// Requirements
+var util         = require('util'),
+	fs           = require('fs'),
+	yeoman       = require('yeoman-generator'),
+	wrench       = require('wrench'),
+	chalk        = require('chalk'),
+	rimraf       = require('rimraf'),
+	git          = require('simple-git')(),
+	wordpress    = require('../util/wordpress'),
+	art          = require('../util/art'),
+	Logger       = require('../util/log'),
+	Config       = require('../util/config');
 
-var fs = require('fs'),
-  https = require('https'),
-  exec   = require('child_process').exec,
-  version,
-  install,
+// Export the module
+module.exports = Generator;
 
-var Skybase = module.exports = function Skybase(args, options, config) {
-  yeoman.generators.Base.apply(this, arguments);
+// Extend the base generator
+function Generator(args, options, config) {
+	yeoman.generators.Base.apply(this, arguments);
 
-  this.on('end', function () {
-    this.installDependencies({ skipInstall: options['skip-install'] });
-  });
+	// Log level option
+	this.option('log', {
+		desc: 'The log verbosity level: [ verbose | log | warn | error ]',
+		defaults: 'log',
+		alias: 'l',
+		name: 'level'
+	});
 
-  this.pkg = JSON.parse(this.readFileAsString(path.join(__dirname, '../package.json')));
+	// Enable advanced features
+	this.option('advanced', {
+		desc: 'Makes advanced features available',
+		alias: 'a'
+	});
+
+	// Shortcut for --log=verbose
+	this.option('verbose', {
+		desc: 'Verbose logging',
+		alias: 'v'
+	});
+	if (this.options.verbose) {
+		this.options.log = 'verbose';
+	}
+
+	// Setup the logger
+	this.logger = Logger({
+		level: this.options.log
+	});
+
+	// Log the options
+	this.logger.verbose('\nOptions: ' + JSON.stringify(this.options, null, '  '));
+
+	// Load the config files
+	this.conf = new Config();
+
 };
+util.inherits(Generator, yeoman.generators.Base);
 
-util.inherits(Skybase, yeoman.generators.Base);
+/**================================
+ * Easy as 1, 2, 3...err....9 maybe 10 or 11
+ **===============================*/
 
-// get the latest stable version of Wordpress
-Skybase.prototype.getVersion = function getVersion() {
-  var cb = this.async();
+// Ask the user what they want done
+Generator.prototype.ohTellMeWhatYouWantWhatYouReallyReallyWant = function() {
 
-  try {
-    https.get('https://api.github.com/repos/WordPress/WordPress/tags', function (res) {
-      var data = '';
-      res.on('data', function (chunk) {
-        data += chunk;
-      });
-      res.on('end', function () {
-          var obj = JSON.parse(data);
-          version = obj[0].name;
-          cb();
-        });
-    }).on('error', function (e) {
-        console.log('Got error: ' + e.message);
-        cb();
-      });
-  }
-  catch (e) {
-    console.log('Something went wrong!!');
-    cb();
-  }
+	// This is an async step
+	var done = this.async(),
+		me = this;
 
-};
+	// Display welcome message
+	this.logger.log(art.wp, {logPrefix: ''});
 
-Skybase.prototype.defaultConfig = function getConfig() {
-  var cb   = this.async();
+	// Get the current version number of wordpress
+	this.logger.verbose('Getting current WP version');
+	wordpress.getCurrentVersion(function(err, ver) {
+		if (err) me.logger.warn('Error getting WP versions.  Falling back to ' + ver);
+		me.logger.verbose('Got current WP version: ' + ver);
+		me.conf.set('wpVer', ver);
+		getInput();
+	});
 
-  this.latestVersion = version;
-  this.defaultAuthorName = '';
-  this.defaultAuthorURI = '';
-  this.defaultTheme = 'https://github.com/roots/roots/';
-  this.acfPlugin = 'https://github.com/elliotcondon/acf/';
+	// Get the input
+	function getInput() {
+		me.prompt(require('./prompts')(me.options.advanced, me.conf.get()), function(input) {
+			me.prompt([{
+				message: 'Does this all look correct?',
+				name: 'confirm',
+				type: 'confirm'
+			}], function(i) {
+				if (i.confirm) {
+					// Set port
+					var portRegex = /:[\d]+$/;
+					var port = input.url.match(portRegex);
+					if (port) input.port = port[0].replace(':', '');
 
-  cb();
-};
+					// Remove port from url
+					input.url = input.url.replace(portRegex, '');
 
-Skybase.prototype.askOptions = function askOptions() {
-  var cb = this.async();
+					// Set customDirs to true if installing as a submodule
+					if (input.submodule) {
+						input.customDirs = true;
+					}
 
-  var prompts = [{
-      type: 'checkbox',
-      name: 'features',
-      message: 'What would you like to do?',
-      choices: [
-      {
-        name: 'Install Skybase',
-        value: 'wpInstall',
-        checked: true
-      },
-      ]
-    }];
+					// Set dirs if custom dir's is not set
+					if (!input.customDirs) {
+						input.wpDir = '.';
+						input.contentDir = 'wp-content';
+					}
 
-  this.prompt(prompts, function (answers) {
-    var features = answers.features;
-    this.wpInstall = features.indexOf('wpInstall') !== -1;
-
-    cb();
-  }.bind(this));
-};
-
-Skybase.prototype.askFor = function askFor() {
-  var cb = this.async();
-
-  var prompts = [{
-      type: 'input',
-      name: 'wordpressVersion',
-      message: 'Which version of WordPress do you want?',
-      default: this.latestVersion
-    },
-    {
-      type: 'input',
-      name: 'themeName',
-      message: 'Name of your theme: ',
-      default: 'skybase'
-    },
-    {
-      type: 'input',
-      name: 'themeBoilerplate',
-      message: 'Starter theme (please provide a github link): ',
-      default: this.defaultTheme
-    },
-    {
-      type: 'confirm',
-      name: 'installACF',
-      message: 'Install Advanced Custom Fields?',
-      default: true
-    },
-    {
-      name: 'dbName',
-      message: 'Database name:',
-      default: ''
-    },
-    {
-      name: 'dbUser',
-      message: 'Database user:',
-      default: ''
-    },
-    {
-      name: 'dbPass',
-      message: 'Database password:',
-      default: ''
-    }];
-
-  this.prompt(prompts, function (props) {
-    this.wordpressVersion = props.wordpressVersion;
-
-    this.themeName = props.themeName;
-    this.themeBoilerplate = props.themeBoilerplate;
-
-    this.dbName = props.dbName;
-    this.dbUser = props.dbUser;
-    this.dbPass = props.dbPass;
-
-    cb();
-  }.bind(this));
-};
-
-// download the framework and unzip it in the project app/
-Skybase.prototype.createApp = function createApp() {
-  var cb   = this.async();
-
-  this.log.writeln('Downloading Wordpress ' + this.wordpressVersion);
-  this.tarball('https://github.com/WordPress/WordPress/tarball/' + this.wordpressVersion, '.', cb);
-};
-
-// remove the basic theme and create a new one
-Skybase.prototype.createTheme = function createTheme() {
-  var cb   = this.async();
-  var self = this;
-
-  this.log.writeln('First let\'s remove the built-in themes we will not use');
-  // remove the existing themes
-  fs.readdir('wp-content/themes', function (err, files) {
-    if (typeof files !== 'undefined' && files.length !== 0) {
-      files.forEach(function (file) {
-        var pathFile = fs.realpathSync('wp-content/themes/' + file),
-          isDirectory = fs.statSync(pathFile).isDirectory();
-
-        if (isDirectory) {
-          rimraf.sync(pathFile);
-          self.log.writeln('Removing ' + pathFile);
-        }
-      });
-    }
-  });
-  this.log.writeln('');
-  this.log.writeln('Now we download the theme');
-
-  // check if the user only gave the repo url or the entire url with /tarball/{branch}
-  var tarballLink = (/[.]*tarball\/[.]*/).test(this.themeBoilerplate);
-  if (!tarballLink) {
-    // if the user gave the repo url we add the end of the url. we assume he wants the master branch
-    var lastChar = this.themeBoilerplate.substring(this.themeBoilerplate.length - 1);
-    if (lastChar === '/') {
-      this.themeBoilerplate = this.themeBoilerplate + 'tarball/master';
-    }
-    else {
-      this.themeBoilerplate = this.themeBoilerplate + '/tarball/master';
-    }
-  }
-
-  // create the theme
-  this.tarball(this.themeBoilerplate, 'wp-content/themes/' + this.themeName, cb);
+					// Save the users input
+					me.conf.set(input);
+					me.logger.verbose('User Input: ' + JSON.stringify(me.conf.get(), null, '  '));
+					me.logger.log(art.go, {logPrefix: ''});
+					done();
+				} else {
+					console.log();
+					getInput();
+				}
+			});
+		});
+	}
 
 };
 
-Skybase.prototype.installPlugins = function installPlugins() {
-	var cb   = this.async();
+// .gitignore
+Generator.prototype.justIgnoreMe = function() {
+	if (this.conf.get('git')) {
+		this.logger.verbose('Copying .gitignore file');
+		this.copy('gitignore.tmpl', '.gitignore');
+		this.logger.verbose('Done copying .gitignore file');
+	}
+};
 
-	if(this.installACF){
-		this.tarball(this.acfPlugin, 'wp-content/plugins/', cb);
+// Git setup
+Generator.prototype.gitIsTheShiz = function() {
+
+	// Using Git?  Init it...
+	if (this.conf.get('git')) {
+		var done = this.async(),
+			me = this;
+
+		this.logger.log('Initializing Git');
+		git.init(function(err) {
+			if (err) me.logger.error(err);
+
+			me.logger.verbose('Git init complete');
+			git.add('.', function(err) {
+				if (err) me.logger.error(err);
+			}).commit('Initial Commit', function(err, d) {
+				if (err) me.logger.error(err);
+
+				me.logger.verbose('Git add and commit complete: ' + JSON.stringify(d, null, '  '));
+				done();
+			});
+		});
+	}
+
+};
+
+// Setup Vagrant config
+Generator.prototype.heIsSuchAVagrant = function() {
+
+	if (this.conf.get('vagrant')) {
+		this.logger.log('Setting up Vagrant');
+		this.logger.verbose('Copying vagrant file');
+		this.template('Vagrantfile', 'Vagrantfile');
+		this.logger.verbose('Copying puppet files');
+		this.bulkDirectory('puppet', 'puppet');
+		this.logger.verbose('Finished setting up Vagrant');
+	}
+
+};
+
+// Install wordpress
+Generator.prototype.installWP = function() {
+
+	var done = this.async(),
+		me   = this;
+
+	if (this.conf.get('submodule')) {
+		this.logger.log('Installing WordPress ' + this.conf.get('wpVer') + ' as a submodule');
+		git.submoduleAdd(wordpress.repo, this.conf.get('wpDir'), function(err) {
+			if (err) me.logger.error(err);
+
+			me.logger.verbose('Submodule added');
+			var cwd = process.cwd();
+			git._baseDir = me.conf.get('wpDir');
+			me.logger.verbose('Checking out WP version ' + me.conf.get('wpVer'));
+			git.checkout(me.conf.get('wpVer'), function(err) {
+				if (err) me.logger.error(err);
+				git._baseDir = cwd;
+				me.logger.verbose('WordPress installed');
+				done();
+			});
+		});
+
+	} else {
+
+		this.logger.log('Installing WordPress ' + this.conf.get('wpVer'));
+		this.remote('wordpress', 'wordpress', this.conf.get('wpVer'), function(err, remote) {
+			remote.bulkDirectory('.', me.conf.get('wpDir'));
+			me.logger.log('WordPress installed');
+			done();
+		});
+
+	}
+
+};
+
+// Setup custom directory structure
+Generator.prototype.somethingsDifferent = function() {
+
+	if (this.conf.get('submodule') || this.conf.get('customDirs')) {
+
+		var me = this,
+			done = this.async();
+
+		this.logger.verbose('Copying index.php');
+		this.template('index.php.tmpl', 'index.php');
+
+		this.logger.log('Setting up the content directory');
+		this.remote('wordpress', 'wordpress', this.conf.get('wpVer'), function(err, remote) {
+			remote.directory('wp-content', me.conf.get('contentDir'));
+			me.logger.verbose('Content directory setup');
+			done();
+		});
+
+	}
+
+};
+
+// wp-config.php
+Generator.prototype.configSetup = function() {
+
+	var done = this.async(),
+		me   = this;
+
+	this.logger.log('Getting salt keys');
+	wordpress.getSaltKeys(function(saltKeys) {
+		me.logger.verbose('Salt keys: ' + JSON.stringify(saltKeys, null, '  '));
+		me.conf.set('saltKeys', saltKeys);
+		me.logger.verbose('Copying wp-config');
+		me.template('wp-config.php.tmpl', 'wp-config.php');
+		done();
+	});
+
+};
+
+// local-config.php
+Generator.prototype.localConfig = function() {
+	this.logger.verbose('Copying wp-config');
+	this.template('local-config.php.tmpl', 'local-config.php');
+};
+
+
+// Set some permissions
+/* @TODO Thinking that maybe permissions should be left up to the user
+   BUT, it seems that the theme stuff needs some permissions set to work....
+*/
+Generator.prototype.setPermissions = function() {
+
+	if (fs.existsSync('.')) {
+		this.logger.log('Setting Permissions: 0755 on .');
+		wrench.chmodSyncRecursive('.', 0755);
+		this.logger.verbose('Done setting permissions on .');
+	}
+
+	if (fs.existsSync(this.conf.get('contentDir'))) {
+		this.logger.log('Setting Permissions: 0775 on ' + this.conf.get('contentDir'));
+		wrench.chmodSyncRecursive(this.conf.get('contentDir'), 0775);
+		this.logger.verbose('Done setting permissions on ' + this.conf.get('contentDir'));
+	}
+
+};
+/**/
+
+// Commit the wordpress stuff
+Generator.prototype.commitThisToMemory = function() {
+
+	if (this.conf.get('git')) {
+		var done = this.async(),
+			me = this;
+
+		this.logger.verbose('Committing WP to Git');
+		git.add('.', function(err) {
+			if (err) me.logger.error(err);
+		}).commit('Installed wordpress', function(err, d) {
+			if (err) me.logger.error(err);
+			me.logger.verbose('Done committing: ' + JSON.stringify(d, null, '  '));
+			done();
+		});
+	}
+
+};
+
+Generator.prototype.removeDefaultThemes = function() {
+var self = this;
+
+	fs.readdir('wp-content/themes', function (err, files) {
+		if (typeof files !== 'undefined' && files.length !== 0) {
+		  files.forEach(function (file) {
+		    var pathFile = fs.realpathSync('wp-content/themes/' + file),
+		      isDirectory = fs.statSync(pathFile).isDirectory();
+
+		    if (isDirectory) {
+		      rimraf.sync(pathFile);
+		      self.log.writeln('Removing ' + pathFile);
+		    }
+		  });
+		}
+	});
+}
+
+// Install theme
+Generator.prototype.themeSetup = function() {
+
+	if (this.conf.get('installTheme')) {
+		var done = this.async()
+			me = this;
+
+		this.logger.log('Setting up theme');
+		wordpress.installTheme(this, this.conf.get(), function() {
+			me.logger.verbose('Theme install complete');
+			done();
+		});
+	}
+
+};
+
+// Install plugins
+Generator.prototype.pluginSetup = function() {
+	if (this.conf.get('installACF')) {
+		var done = this.async()
+			me = this;
+
+		this.logger.log('Installing Advanced Custom Fields plugin');
+		wordpress.installPlugins(this, this.conf.get(), function() {
+			me.logger.verbose('Plugin install complete');
+			done();
+		});
 	}
 }
 
-Skybase.prototype.app = function app() {
-  this.copy('index.php', 'index.php');
-  this.template('_wp-config.php', 'wp-config.php');
-  this.template('_Gruntfile.coffee', 'Gruntfile.coffee');
+// Setup theme
+Generator.prototype.dummyYouHaveToPlugItInFirst = function() {
+
+	if (this.conf.get('installTheme')) {
+		this.logger.log('Starting theme setup');
+		wordpress.setupTheme(this, this.conf.get(), this.async());
+		this.logger.verbose('Theme setup complete');
+	}
+
 };
 
-Skybase.prototype.projectfiles = function projectfiles() {
-  this.copy('_package.json', 'package.json');
-  this.copy('editorconfig', '.editorconfig');
-  this.copy('jshintrc', '.jshintrc');
+// Commit again with the template
+Generator.prototype.gitMeMOARCommits = function() {
+
+	if (this.conf.get('git') && this.conf.get('installTheme')) {
+		var done = this.async(),
+			me = this;
+		this.logger.verbose('Committing template to Git');
+		git.add('.', function(err) {
+			if (err) me.logger.error(err);
+		}).commit('Installed theme', function(err, d) {
+			if (err) me.logger.error(err);
+			me.logger.verbose('Done committing: ', JSON.stringify(d, null, '  '));
+			done();
+		});
+	}
+
 };
 
-Skybase.prototype.installCore = function installCore() {
-  var cb = this.async();
+// Run vagrant up
+Generator.prototype.vagrantUp = function() {
 
-  if (this.wpInstall) {
-    this.log.writeln('');
-    this.log.writeln('Installing WordPress');
-    install = exec('wp core install --path="core" --admin_user="admin" --admin_password="1" --admin_email=" " --title=' + this.themeName, function (error, stdout, stderr) {
-      if (error !== null) {
-        console.log('exec error: ' + error);
-      }
-      console.log(stdout);
-      console.log(stderr);
-      cb();
-    });
-  }
+	if (this.conf.get('vagrant')) {
+		var done = this.async();
+		this.logger.log('Running vagrant up');
+		var me = this;
+		var child = require('child_process').exec('vagrant up', function(err) {
+			if (err) return me.logger.error(err);
+			me.logger.verbose('Finished running Vagrant');
+			done();
+		});
+		child.on('error', function(err) {
+			process.stderr.write(err);
+		});
+		child.stdout.on('data', function(data) {
+			process.stdout.write(data);
+		});
+		child.stderr.on('data', function(err) {
+			process.stderr.write(err);
+		});
+	}
+
+};
+
+// Save settings to .yeopress file
+Generator.prototype.saveDaSettings = function() {
+
+	this.logger.log('Writing .yeopress file');
+	fs.writeFileSync('.yeopress', JSON.stringify(this.conf.get(), null, '\t'));
+
+};
+
+// All done
+Generator.prototype.oopsIPeedMyself = function() {
+	this.logger.log(chalk.bold.green('\nAll Done!!\n------------------------\n'), {logPrefix: ''});
+	this.logger.log('I tried my best to set things up, but I\'m only human right? **wink wink**\nSo, you should probably check your `wp-config.php` to make sure all the settings work on your environment.', {logPrefix: ''});
+	this.logger.log('Have fun pressing your words!\n', {logPrefix: ''});
 };
