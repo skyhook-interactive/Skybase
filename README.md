@@ -11,6 +11,7 @@ A WordPress generator for Yeoman.
 ### What it is?
 - Grabs the latest version of WordPress
 - Sets up git
+- Removes the default WordPress themes
 - Installs a custom theme
-- Optionally install plugins
-- Removes Hello Dolly plugin
+- Optionally installs a set of plugins
+- Removes the Hello Dolly plugin
